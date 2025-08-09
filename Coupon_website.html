@@ -1,0 +1,300 @@
+<!doctype html>
+<!--
+  GoDeal - Advanced Coupon Template
+  Features:
+   - Instant search + category filter + sort by expiry
+   - Click-to-copy coupon codes
+   - Shareable coupon modal with affiliate link (opens in new tab)
+   - Auto-expiry badge and live countdown
+   - JSON-LD schema for SEO (generated dynamically per coupon)
+   - Easy to add coupons (see example below)
+   - Mobile-friendly and GitHub Pages / Netlify ready
+
+  Deployment: save as index.html and publish to GitHub Pages or Netlify.
+  For per-store SEO pages, create a folder per store (e.g. /parking/way-com/index.html)
+
+  NOTE: Replace all "AFFILIATE_LINK_HERE" with your actual affiliate tracking URLs.
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>GoDeal — Coupons & Promo Codes | Save on Parking, Food, Travel</title>
+  <meta name="description" content="Latest coupons & promo codes — parking, food, travel, shopping. Click-to-copy codes, limited-time deals, and verified discounts.">
+  <meta name="robots" content="index,follow">
+  <link rel="icon" href="data:;base64,iVBORw0KGgo=">
+  <style>
+    :root{--accent:#ff6600;--muted:#666;--card-bg:#fff;--bg:#f6f7fb}
+    *{box-sizing:border-box}
+    body{font-family:Inter,system-ui,Arial,sans-serif;margin:0;background:var(--bg);color:#111}
+    header{background:linear-gradient(90deg,var(--accent),#e65c00);color:#fff;padding:28px 16px;text-align:center}
+    .wrap{max-width:1100px;margin:20px auto;padding:0 16px}
+    .controls{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px}
+    input[type=text],select{padding:10px;border-radius:8px;border:1px solid #ddd;min-width:160px}
+    .btn{background:var(--accent);color:#fff;padding:9px 12px;border-radius:8px;text-decoration:none;display:inline-block}
+    .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+    .coupon{background:var(--card-bg);padding:14px;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,0.06);position:relative}
+    .coupon h3{margin:0 0 6px;color:var(--accent);font-size:18px}
+    .meta{font-size:13px;color:var(--muted);margin-bottom:8px}
+    .code{display:inline-flex;gap:8px;align-items:center;padding:8px;border-radius:8px;background:#f4f5f7;border:1px dashed #e0e0e0}
+    .small{font-size:12px}
+    .badge{position:absolute;top:12px;right:12px;padding:6px 8px;border-radius:8px;font-weight:600}
+    .expired{background:#ddd;color:#555}
+    .live{background:#38a169;color:#fff}
+    .actions{margin-top:10px;display:flex;gap:8px;flex-wrap:wrap}
+    footer{padding:18px;text-align:center;color:#666;font-size:13px;margin-top:30px}
+    @media(max-width:800px){.grid{grid-template-columns:1fr}}
+    /* modal */
+    .modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,0.45)}
+    .modal .panel{background:#fff;padding:18px;border-radius:12px;max-width:560px;width:100%}
+    .row{display:flex;gap:8px;align-items:center}
+    .muted{color:#666}
+    .countdown{font-weight:700}
+  </style>
+</head>
+<body>
+  <header>
+    <h1 style="margin:0;font-size:24px">GoDeal — Coupons & Promo Codes</h1>
+    <p style="margin:6px 0 0;opacity:.95">Click-to-copy codes • Verified deals • Limited-time discounts</p>
+  </header>
+
+  <main class="wrap">
+    <div class="controls">
+      <input id="search" type="text" placeholder="Search stores, coupon names, % off...">
+      <select id="category">
+        <option value="">All categories</option>
+        <option value="parking">Parking</option>
+        <option value="food">Food</option>
+        <option value="travel">Travel</option>
+        <option value="shopping">Shopping</option>
+      </select>
+      <select id="sort">
+        <option value="relevance">Sort: Relevance</option>
+        <option value="newest">Sort: Newest</option>
+        <option value="expiring">Sort: Expiring Soon</option>
+      </select>
+      <a class="btn" id="add-sample">Add sample coupon</a>
+      <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
+        <span class="small muted">Share:</span>
+        <a class="btn" id="twitter-share" href="#" target="_blank">Twitter</a>
+      </div>
+    </div>
+
+    <section id="coupon-area">
+      <div class="grid" id="coupon-list">
+        <!-- Coupons are injected here by JS -->
+      </div>
+    </section>
+
+    <!-- Template Modal -->
+    <div class="modal" id="modal">
+      <div class="panel" role="dialog" aria-modal="true">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+          <strong id="modal-title">Coupon</strong>
+          <button id="modal-close" class="btn" style="background:#999">Close</button>
+        </div>
+        <p id="modal-desc" class="muted"></p>
+        <div style="margin:8px 0" class="row">
+          <div id="modal-code" class="code" style="flex:1;font-weight:700"></div>
+          <button class="btn" id="modal-copy">Copy</button>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">
+          <div class="small muted">Expires: <span id="modal-expiry" class="countdown"></span></div>
+          <div><a id="modal-visit" class="btn" target="_blank">Use Deal</a> <a id="modal-share" class="btn" style="background:#2d8cf0">Share</a></div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <footer>
+    © <span id="year"></span> GoDeal — Built for speed. Hosted on GitHub Pages / Netlify.
+  </footer>
+
+  <script>
+    // ---- Helper: example coupon data ----
+    const coupons = [
+      {
+        id: 'way-20-parking',
+        title: 'Way.com — 20% Off Parking',
+        description: 'Save 20% on airport and city parking bookings. Verified 2025 deals.',
+        code: 'PARK20',
+        affiliate: 'AFFILIATE_LINK_HERE',
+        category: 'parking',
+        created: '2025-08-01',
+        expires: '2025-09-01T23:59:59Z',
+        verified: true
+      },
+      {
+        id: 'ubereats-new-10',
+        title: 'Uber Eats — $10 Off First Order',
+        description: 'New customers only. Minimum order $15.',
+        code: 'UBER10',
+        affiliate: 'AFFILIATE_LINK_HERE',
+        category: 'food',
+        created: '2025-07-25',
+        expires: '2025-10-01T23:59:59Z',
+        verified: false
+      },
+      {
+        id: 'booking-15',
+        title: 'Booking.com — Up to 15% Off Hotels',
+        description: 'Select hotels, instant discount at checkout.',
+        code: '',
+        affiliate: 'AFFILIATE_LINK_HERE',
+        category: 'travel',
+        created: '2025-08-03',
+        expires: '2025-12-31T23:59:59Z',
+        verified: true
+      }
+    ];
+
+    // ---- Utilities ----
+    const $ = sel => document.querySelector(sel);
+    const $$ = sel => Array.from(document.querySelectorAll(sel));
+    document.getElementById('year').innerText = new Date().getFullYear();
+
+    // Format relative expiry / badge
+    function daysBetween(d1,d2){
+      return Math.ceil((new Date(d2)-new Date(d1))/(1000*60*60*24));
+    }
+
+    function isExpired(expires){
+      if(!expires) return false;
+      return new Date(expires) < new Date();
+    }
+
+    function render() {
+      const list = $('#coupon-list');
+      list.innerHTML = '';
+
+      // get filters
+      const q = $('#search').value.trim().toLowerCase();
+      const cat = $('#category').value;
+      const sort = $('#sort').value;
+
+      let data = coupons.slice();
+
+      // filter
+      data = data.filter(c => {
+        if(cat && c.category !== cat) return false;
+        if(!q) return true;
+        const hay = (c.title + ' ' + c.description + ' ' + (c.code||'')).toLowerCase();
+        return hay.includes(q);
+      });
+
+      // sort
+      if(sort === 'newest') data.sort((a,b)=> new Date(b.created)-new Date(a.created));
+      if(sort === 'expiring') data.sort((a,b)=> new Date(a.expires||'9999')-new Date(b.expires||'9999'));
+
+      data.forEach(c => {
+        const card = document.createElement('article');
+        card.className = 'coupon';
+        const expired = isExpired(c.expires);
+        const badge = expired ? '<span class="badge expired">EXPIRED</span>' : '<span class="badge live">LIVE</span>';
+        const codeDisplay = c.code ? `<span class="code" title="Click to copy">${c.code}</span>` : '<span class="muted small">No code — automatic discount</span>';
+
+        card.innerHTML = `\
+          ${badge} \
+          <h3>${c.title}</h3>\
+          <div class="meta">${c.description}</div>\
+          <div>${codeDisplay}</div>\
+          <div class="actions">\
+            <button class="btn copy" data-id="${c.id}">Copy Code</button>\
+            <button class="btn details" data-id="${c.id}">View / Use</button>\
+            <a class="btn" href="${c.affiliate}" data-id="${c.id}" target="_blank">Go to Deal</a>\
+            <span class="small muted" style="margin-left:auto">Expires: ${c.expires ? new Date(c.expires).toLocaleDateString() : 'No expiry'}</span>\
+          </div>`;
+
+        list.appendChild(card);
+      });
+
+      // attach events
+      $$('.copy').forEach(btn=>btn.onclick = onCopy);
+      $$('.details').forEach(btn=>btn.onclick = onDetails);
+    }
+
+    function onCopy(e){
+      const id = e.currentTarget.dataset.id;
+      const coupon = coupons.find(x=>x.id===id);
+      const code = coupon.code || '';
+      if(!code){
+        alert('This deal requires no code — click Use Deal to go to the site.');
+        return;
+      }
+      navigator.clipboard.writeText(code).then(()=>{
+        e.currentTarget.innerText = 'Copied!';
+        setTimeout(()=>e.currentTarget.innerText='Copy Code',1800);
+      }).catch(()=>alert('Copy failed — please manually select and copy the code.'));
+    }
+
+    function onDetails(e){
+      const id = e.currentTarget.dataset.id;
+      const coupon = coupons.find(x=>x.id===id);
+      if(!coupon) return;
+      $('#modal-title').innerText = coupon.title;
+      $('#modal-desc').innerText = coupon.description;
+      $('#modal-code').innerText = coupon.code || '— automatic discount (no code)';
+      $('#modal-expiry').innerText = coupon.expires ? new Date(coupon.expires).toLocaleString() : 'No expiry';
+      $('#modal-visit').href = coupon.affiliate;
+      $('#modal').style.display = 'flex';
+
+      // set share link
+      const url = location.origin + location.pathname + '#coupon=' + encodeURIComponent(coupon.id);
+      $('#modal-share').onclick = ()=>navigator.share ? navigator.share({title:coupon.title,text:coupon.description,url}) : window.open('https://twitter.com/intent/tweet?text='+encodeURIComponent(coupon.title+' — '+url),'_blank');
+      $('#modal-copy').onclick = ()=>{ if(coupon.code) navigator.clipboard.writeText(coupon.code).then(()=>alert('Copied!')) }
+    }
+
+    $('#modal-close').onclick = ()=>$('#modal').style.display='none';
+    window.onclick = (e)=>{ if(e.target===$('#modal')) $('#modal').style.display='none'};
+
+    // search inputs
+    $('#search').addEventListener('input', render);
+    $('#category').addEventListener('change', render);
+    $('#sort').addEventListener('change', render);
+
+    // add sample for quick editing
+    $('#add-sample').onclick = ()=>{
+      const id = 'sample-'+Math.random().toString(36).slice(2,9);
+      coupons.unshift({id,title:'Sample - 10% Off',description:'Sample coupon added for testing',code:'SAMPLE10',affiliate:'AFFILIATE_LINK_HERE',category:'shopping',created:new Date().toISOString().slice(0,10),expires:new Date(Date.now()+7*24*3600*1000).toISOString(),verified:false});
+      render();
+    }
+
+    // deep-link to coupon via fragment
+    function openDeepLink(){
+      if(location.hash.startsWith('#coupon=')){
+        const id = decodeURIComponent(location.hash.split('=')[1]);
+        const btn = document.querySelector('.details[data-id="'+id+'"]');
+        if(btn) btn.click();
+      }
+    }
+
+    
+    function injectSchema(){
+      const schema = {"@context":"https://schema.org","@graph":coupons.map(c=>({
+        "@type":"Offer",
+        "url":location.origin+location.pathname+'#coupon='+encodeURIComponent(c.id),
+        "name":c.title,
+        "description":c.description,
+        "availability": isExpired(c.expires) ? 'https://schema.org/OutOfStock' : 'https://schema.org/InStock',
+        "validFrom":c.created,
+        "validThrough":c.expires || undefined
+      }))};
+      const s = document.createElement('script'); s.type='application/ld+json'; s.textContent = JSON.stringify(schema);
+      document.head.appendChild(s);
+    }
+
+    
+    render(); injectSchema(); openDeepLink();
+
+    
+    console.log('SEO tips: create one unique page per store, use descriptive meta title/description, implement sitemap.xml, add internal linking, and get a few high-quality backlinks.');
+
+    
+    $('#twitter-share').href = 'https://twitter.com/intent/tweet?text='+encodeURIComponent('Latest coupons on GoDeal - save now!');
+  </script>
+
+  
+  
+</body>
+</html>
